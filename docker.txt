@@ -1,5 +1,3 @@
-# gocker
-
 - Récupérer le digest du tag latest : https://hub.docker.com/v2/namespaces/library/repositories/nginx/tags/latest
 - Liste des tags d'une image : https://hub.docker.com/v2/namespaces/library/repositories/nginx/tags?page_size=100
 - Pour chaque tag :

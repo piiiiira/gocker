@@ -1,0 +1,19 @@
+images:
+  - namespace: crowdsecurity
+    image: crowdsec
+  - namespace: amir20
+    image: dozzle
+  - namespace: filegator
+    image: filegator
+  - namespace: authelia
+    image: authelia
+  - namespace: library
+    image: postgres
+  - namespace: deluan
+    image: navidrome
+  - namespace: portainer
+    image: portainer-ce
+  - namespace: library
+    image: traefik
+
+tag: latest

@@ -2,12 +2,25 @@ package main
 
 import (
 	"encoding/json"
-	"flag"
 	"fmt"
 	"io"
 	"net/http"
+	"os"
+	"regexp"
 	"time"
+
+	"go.yaml.in/yaml/v4"
 )
+
+type Image struct {
+	Namespace string `yaml:"namespace"`
+	Image     string `yaml:"image"`
+}
+
+type Config struct {
+	Images []Image `yaml:"images"`
+	Tag    string  `yaml:"tag"`
+}
 
 type TagDigest struct {
 	Name       string
@@ -15,8 +28,8 @@ type TagDigest struct {
 	LastPushed string
 }
 
-func getLatestDigest(namespace, image string) (string, error) {
-	url := fmt.Sprintf("https://hub.docker.com/v2/namespaces/%s/repositories/%s/tags/latest", namespace, image)
+func getTagDigest(tag, namespace, image string) (string, string, error) {
+	url := fmt.Sprintf("https://hub.docker.com/v2/namespaces/%s/repositories/%s/tags/%s", namespace, image, tag)
 
 	req, _ := http.NewRequest("GET", url, nil)
 
@@ -28,10 +41,19 @@ func getLatestDigest(namespace, image string) (string, error) {
 	var result map[string]any
 	json.Unmarshal(body, &result)
 
-	if digest, ok := result["digest"].(string); ok {
-		return digest, nil
+	if result["digest"] != nil {
+		if result["tag_last_pushed"] != nil {
+			lastPushed := result["tag_last_pushed"].(string)
+			return result["digest"].(string), lastPushed, nil
+		}
 	}
-	return "", fmt.Errorf("digest not found")
+	return "", "", fmt.Errorf("digest not found")
+}
+
+func isSemver(version string) bool {
+	pattern := `^v?\d+(\.\d+)?(\.\d+)?$`
+	matched, _ := regexp.MatchString(pattern, version)
+	return matched
 }
 
 func getAllTags(namespace, image string) ([]TagDigest, error) {
@@ -51,29 +73,77 @@ func getAllTags(namespace, image string) ([]TagDigest, error) {
 	if results, ok := resultAll["results"].([]any); ok {
 		for _, tag := range results {
 			tagMap := tag.(map[string]any)
-			name := tagMap["name"].(string)
-			digest := tagMap["digest"].(string)
-			lastPushed := tagMap["tag_last_pushed"].(string)
+
+			var name string
+			if tagMap["name"] != nil {
+				name = tagMap["name"].(string)
+			} else {
+				name = "prout"
+			}
+
+			var digest string
+			if tagMap["digest"] != nil {
+				digest = tagMap["digest"].(string)
+			}
+
+			var lastPushed string
+			if tagMap["tag_last_pushed"] != nil {
+				lastPushed = tagMap["tag_last_pushed"].(string)
+			}
 			tags = append(tags, TagDigest{Name: name, Digest: digest, LastPushed: lastPushed})
 		}
 	}
+
 	return tags, nil
 }
 
+func getConfig(configFile string) (Config, error) {
+	data, err := os.ReadFile(configFile)
+	if err != nil {
+		return Config{}, err
+	}
+
+	var config Config
+	err = yaml.Unmarshal(data, &config)
+	if err != nil {
+		return Config{}, err
+	}
+
+	return config, nil
+}
+
 func main() {
-	namespace := flag.String("namespace", "library", "Docker namespace")
-	image := flag.String("image", "nginx", "Docker image name")
-	flag.Parse()
+	config, err := getConfig("config.yml")
+	if err != nil {
+		fmt.Println("Error getting config:", err)
+	}
 
-	digest, _ := getLatestDigest(*namespace, *image)
-	fmt.Println("Latest digest:", digest)
+	fmt.Println("Tag:", config.Tag)
 
-	tags, _ := getAllTags(*namespace, *image)
-	for _, tag := range tags {
-		if tag.Digest == digest {
-			lastPushed, _ := time.Parse(time.RFC3339, tag.LastPushed)
-			daysSince := int(time.Since(lastPushed).Hours() / 24)
-			fmt.Printf("%s\t%d days ago\n", tag.Name, daysSince)
+	for _, img := range config.Images {
+		fmt.Printf("\n*** %s/%s ***\n", img.Namespace, img.Image)
+
+		digest, lastPushed, err := getTagDigest(config.Tag, img.Namespace, img.Image)
+		if err != nil {
+			fmt.Println("Error getting latest digest:", err)
+			continue
+		}
+
+		lastPushedFormated, _ := time.Parse(time.RFC3339, lastPushed)
+		daysSince := int(time.Since(lastPushedFormated).Hours() / 24)
+		fmt.Println("Digest:", digest)
+		fmt.Println("Pushed:", daysSince, "days ago")
+
+		tags, err := getAllTags(img.Namespace, img.Image)
+		if err != nil {
+			fmt.Println("Error getting tags:", err)
+			continue
+		}
+
+		for _, tag := range tags {
+			if tag.Digest == digest && isSemver(tag.Name) {
+				fmt.Println(tag.Name)
+			}
 		}
 	}
 }

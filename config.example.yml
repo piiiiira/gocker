@@ -1,0 +1,10 @@
+tag: latest
+
+images:
+  - namespace: library
+    image: postgres
+  - namespace: portainer
+    image: portainer-ce
+  - namespace: library
+    image: traefik
+

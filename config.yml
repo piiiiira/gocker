@@ -1,3 +1,5 @@
+tag: latest 
+
 images:
   - namespace: crowdsecurity
     image: crowdsec
@@ -15,5 +17,3 @@ images:
     image: portainer-ce
   - namespace: library
     image: traefik
-
-tag: latest

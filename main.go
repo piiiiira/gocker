@@ -51,7 +51,7 @@ func getTagDigest(tag, namespace, image string) (string, string, error) {
 }
 
 func isSemver(version string) bool {
-	pattern := `^v?\d+(\.\d+)?(\.\d+)?$`
+	pattern := `^v?\d+\.\d+?(\.\d+)?$`
 	matched, _ := regexp.MatchString(pattern, version)
 	return matched
 }
@@ -121,8 +121,6 @@ func main() {
 	fmt.Println("Tag:", config.Tag)
 
 	for _, img := range config.Images {
-		fmt.Printf("\n*** %s/%s ***\n", img.Namespace, img.Image)
-
 		digest, lastPushed, err := getTagDigest(config.Tag, img.Namespace, img.Image)
 		if err != nil {
 			fmt.Println("Error getting latest digest:", err)
@@ -131,8 +129,8 @@ func main() {
 
 		lastPushedFormated, _ := time.Parse(time.RFC3339, lastPushed)
 		daysSince := int(time.Since(lastPushedFormated).Hours() / 24)
-		fmt.Println("Digest:", digest)
-		fmt.Println("Pushed:", daysSince, "days ago")
+
+		fmt.Printf("\n%s/%s:{TAG}@%s\n", img.Namespace, img.Image, digest)
 
 		tags, err := getAllTags(img.Namespace, img.Image)
 		if err != nil {
@@ -145,5 +143,7 @@ func main() {
 				fmt.Println(tag.Name)
 			}
 		}
+
+		fmt.Println("Pushed:", daysSince, "days ago")
 	}
 }

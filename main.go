@@ -77,8 +77,6 @@ func getAllTags(namespace, image string) ([]TagDigest, error) {
 			var name string
 			if tagMap["name"] != nil {
 				name = tagMap["name"].(string)
-			} else {
-				name = "prout"
 			}
 
 			var digest string
